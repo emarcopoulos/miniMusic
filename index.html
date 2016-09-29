@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<title>Replay</title>
+</head>
+
+<body>
+	<h1 id="title">Replay Machine</h1>
+	<p id = 'songName'></p>
+	<audio id = 'mp3' controls autoplay><source id='source' src ='' type="audio/mp3"/></audio>
+	<button id='back' onclick = 'if(repeat){music.onended();}else{back();}'>&lt;&lt;</button>
+	<button onclick = 'music.onended()'>&gt;&gt;</button>
+	<button onclick = 'repeat=!repeat;if(repeat){this.innerHTML="Continue";}else{this.innerHTML="Repeat!";}'>Repeat!</button>
+	<button onclick = 'shuffle=!shuffle;if(shuffle){this.innerHTML="Sequence";}else{this.innerHTML="Shuffle!";}'>Shuffle!</button>
+	<button onclick = 'if(document.getElementById("songs").innerHTML==""){select();}else{document.getElementById("songs").innerHTML="";}'>Playlist</button>
+	<div id = 'songs'></div>
+	<div id = 'playlist'></div>
+
+	<script>
+		var music = document.getElementById('mp3');
+		var srcs = ['']; /* put urls here */
+		var playlist=[];
+		for (var i = 0; i < srcs.length; i++) {
+			playlist[i] = true;
+		}
+		var song = document.getElementById('songName');
+		var shuffle = false;
+		var repeat = false;
+		var parseName = function (mp3) {
+			var name = '';
+			for (var i = mp3.length - 1; i >= 0; i--) {
+				if (mp3[i] == '.') {
+					for (var j = 0; j < i; j++) {
+						name += mp3[j];
+					}
+					return name;
+				}
+			}
+		};
+		var backButton = document.getElementById('back');
+		backButton.disabled = true;
+		var prev = [];
+		var source = document.getElementById('source');
+		var current = Math.floor((Math.random() * srcs.length));
+	    source.src= srcs[current];
+		song.innerHTML = parseName(srcs[current]);
+		music.onended = function () {
+			if (repeat) {
+				music.currentTime=0;
+				music.play();
+				return;
+			}
+			updateBack(current);
+			if (shuffle) {
+				do {
+					current = Math.floor((Math.random()*srcs.length));
+				} while (!playlist[current]);
+				source.src = srcs[current];
+			} else {
+				do {
+					current = ++current%srcs.length;
+				} while (!playlist[current]);
+				source.src = srcs[current];
+			}
+			music.load();
+			song.innerHTML = parseName(srcs[current]);
+		};
+		var newlist = function () {
+			for (var i = 0; i < srcs.length; i++) {
+				if (document.getElementById(srcs[i]).checked) {
+					playlist[i] = true;
+				} else {
+					playlist[i] = false;
+				}
+			}
+		};
+		var isChecked = function (i) {
+			if (playlist[i]) {
+				return 'checked';
+			}
+		};
+		var select = function () {
+			var songs = document.getElementById('songs');
+			songs.innerHTML ='<button onclick="newlist();songs.innerHTML='+"'';"+'">Set</button><button onclick="saveList()">Save Playlist</button><button onclick="modList(1)">Load Playlist</button><button onclick="modList(0)">Remove Playlist</button>';
+			for (var i = 0; i < srcs.length; i++) {
+				songs.innerHTML += '<p><span onclick="current=this.id;source.src=srcs[this.id];music.load();song.innerHTML=parseName(srcs[this.id]);" id="'+i+'">'+parseName(srcs[i])+'</span><input id="'+srcs[i]+'" type="checkbox" '+isChecked(i)+'/></p>';
+			}
+			songs.innerHTML+='<button onclick="newlist();songs.innerHTML='+"'';"+'">Set</button><button onclick="saveList()">Save Playlist</button><button onclick="modList(1)">Load Playlist</button><button onclick="modList(0)">Remove Playlist</button>';
+		};
+		var updateBack = function (song) {
+			if (song == -1) {
+				if (prev.length > 1) {
+					prev.splice(prev.length-1, 1);
+				} else {
+					prev = [];
+					backButton.disabled = true;
+				}
+			} else {
+				prev[prev.length] = song;
+				backButton.disabled = false;
+			}
+		};
+		var back = function () {
+			current = prev[prev.length-1];
+			source.src=srcs[prev[prev.length-1]];
+			music.load();
+			song.innerHTML = parseName(srcs[prev[prev.length-1]]);
+			updateBack(-1);
+		};
+		var saveList = function () {
+			if (!localStorage.getItem('playlists')) {
+				localStorage.setItem('playlists', '[]');
+			}
+			document.getElementById('playlist').innerHTML='<input id="saveName"/><button onclick="newlist();saveIt()">Save!</button>';
+		};
+		var saveIt = function () {
+			var name=document.getElementById('saveName').value;
+			if (!name) {
+				return;
+			}
+			var playlists = JSON.parse(localStorage.getItem('playlists'));
+			for (var i = 0; i < playlists.length; i++) {
+				if (name == playlists[i].name) {
+					var json = {'name':name,'playlist':playlist};
+					var id = JSON.stringify({"i":i,"json":json});
+					document.getElementById('playlist').innerHTML = '<p>Name already Exists. Replace existing playlist?</p><button id='+id+' onclick="var playlists = JSON.parse(localStorage.getItem('+"'playlists'"+'));playlists[JSON.parse(this.id).i]=JSON.parse(this.id).json;localStorage.setItem('+"'playlists',"+'JSON.stringify(playlists));document.getElementById('+"'playlist'"+').innerHTML='+"''"+';">Sure!</button><button onclick="document.getElementById('+"'playlist'"+').innerHTML='+"''"+';">Nah</button>';
+					document.getElementById('songs').innerHTML='';
+					return;
+				}
+			}
+			playlists[playlists.length] = {'name':name,'playlist':playlist};
+			localStorage.setItem("playlists", JSON.stringify(playlists));
+			document.getElementById('songs').innerHTML='';
+			document.getElementById('playlist').innerHTML= '';
+		};
+		var modList = function (loadOrDelete) {
+			var playlists = JSON.parse(localStorage.getItem('playlists'));
+			if (!playlists || playlists.length == 0) {
+				return;
+			}
+			document.getElementById('songs').innerHTML='';
+			for (var i = 0; i < playlists.length; i++) {
+				document.getElementById('playlist').innerHTML += '<p id='+JSON.stringify({"list":playlists[i].playlist,"i":i,"func":loadOrDelete})+' onclick="if(JSON.parse(this.id).func){loadIt(this);}else{removeIt(this);}">'+playlists[i].name+'</p>';
+			}
+		};
+		var loadIt = function (obj) {
+			playlist=JSON.parse(obj.id).list;
+			document.getElementById('playlist').innerHTML='';
+		};
+		var removeIt = function (obj) {
+			var playlists = JSON.parse(localStorage.getItem('playlists'));
+			playlists.splice(JSON.parse(obj.id).i,1);
+			localStorage.setItem("playlists", JSON.stringify(playlists));
+			document.getElementById('playlist').innerHTML='';		
+		}
+		document.body.onkeyup = function(e){
+		    if(e.keyCode == 32){
+		    	if (music.paused) {
+		    		music.play();
+		    	} else {
+		    		music.pause();
+		    	}
+		    }
+		    if(e.keyCode == 1) {}
+		}
+	</script>
+</body>
+</html>
